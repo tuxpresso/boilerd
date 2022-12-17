@@ -156,5 +156,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "TRACE - pulse deadline is %d\n", pulse_end_ms);
       fprintf(stderr, "TRACE - period deadline is %d\n", period_end_ms);
     }
+
+    usleep(500); // .5 ms tick
   }
 }
