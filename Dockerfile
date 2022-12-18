@@ -22,6 +22,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         clang \
         clang-format \
+        libzmq3-dev \
         make
 
 COPY --from=0 /usr/local/include/pidc.h /usr/include
