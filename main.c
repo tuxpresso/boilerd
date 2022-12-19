@@ -8,6 +8,8 @@
 
 #include <pidc.h>
 
+#include "timer.h"
+
 struct boilerd_opts {
   int gpio;
   int iio;
@@ -23,21 +25,6 @@ struct boilerd_pwm {
   int pulse_ms;
   int min_pulse_ms;
 };
-
-struct boilerd_timer {
-  int now_ms;
-  int deadline_ms;
-};
-
-void boilerd_timer_update(struct boilerd_timer *timer, int now_ms) {
-  timer->now_ms = now_ms;
-}
-void boilerd_timer_schedule(struct boilerd_timer *timer, int duration_ms) {
-  timer->deadline_ms = timer->now_ms + duration_ms;
-}
-int boilerd_timer_is_expired(struct boilerd_timer *timer) {
-  return !(timer->now_ms < timer->deadline_ms);
-}
 
 int boilerd_read_temp(int iio_fd, int *temp) {
   char temp_buf[255];

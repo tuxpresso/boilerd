@@ -1,5 +1,5 @@
 all: boilerd
-boilerd: main.c
+boilerd: main.c timer.c
 	$(CC) $^ -lpidc -o $@
 .phony: clean test
 clean:
