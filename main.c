@@ -15,6 +15,7 @@ struct boilerd_opts {
   int kp;
   int ki;
   int kd;
+  int max_temp;
 };
 
 struct boilerd_pwm {
@@ -82,6 +83,7 @@ int parse_opts(int argc, char **argv, struct boilerd_opts *opts) {
   opts->kp = 0;
   opts->ki = 0;
   opts->kd = 0;
+  opts->max_temp = 0;
   for (int i = 1; i + 1 < argc; i += 2) {
     if (!strcmp(argv[i], "-g")) {
       opts->gpio = atoi(argv[i + 1]);
@@ -95,6 +97,8 @@ int parse_opts(int argc, char **argv, struct boilerd_opts *opts) {
       opts->ki = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-kd")) {
       opts->kd = atoi(argv[i + 1]);
+    } else if (!strcmp(argv[i], "-max")) {
+      opts->max_temp = atoi(argv[i + 1]);
     } else {
       return 1;
     }
@@ -106,12 +110,15 @@ int main(int argc, char **argv) {
   struct boilerd_opts opts;
   if (parse_opts(argc, argv, &opts)) {
     fprintf(stderr,
-            "%s -g gpio -i iio -sp setpoint [-kp pgain -ki igain -kd dgain]\n",
+            "%s -g gpio -i iio -sp setpoint [-kp pgain -ki igain -kd dgain -max"
+            "max_temp]\n",
             argv[0]);
     return 1;
   }
-  fprintf(stderr, "INFO  - gpio %d, iio %d, sp %d, kp %d, ki %d, kd %d\n",
-          opts.gpio, opts.iio, opts.sp, opts.kp, opts.ki, opts.kd);
+  fprintf(stderr,
+          "INFO  - gpio %d, iio %d, sp %d, kp %d, ki %d, kd %d, max_temp %d\n",
+          opts.gpio, opts.iio, opts.sp, opts.kp, opts.ki, opts.kd,
+          opts.max_temp);
 
   char path[255];
   int gpio_fd, iio_fd;
@@ -131,7 +138,6 @@ int main(int argc, char **argv) {
 
   struct boilerd_pwm pwm = {
       .period_ms = 1000, .pulse_ms = 0, .min_pulse_ms = 50};
-  int max_temp = 2000;
 
   struct boilerd_timer period_timer = {0};
   struct boilerd_timer pulse_timer = {0};
@@ -160,11 +166,11 @@ int main(int argc, char **argv) {
       }
       fprintf(stderr, "INFO  - temperature is %d\n", temp);
 
-      if (temp > max_temp) {
+      if (temp > opts.max_temp) {
         write(gpio_fd, "0", 1);
         is_on = 0;
         boilerd_timer_schedule(&period_timer, pwm.period_ms);
-        fprintf(stderr, "WARN  - temperature exceeds %d\n", max_temp);
+        fprintf(stderr, "WARN  - temperature exceeds %d\n", opts.max_temp);
         continue;
       }
 
