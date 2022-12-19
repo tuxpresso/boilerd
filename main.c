@@ -108,6 +108,8 @@ int main(int argc, char **argv) {
 
       int temp;
       if (boilerd_read_temp(iio_fd, &temp)) {
+        write(gpio_fd, "0", 1);
+        is_on = 0;
         boilerd_timer_schedule(&period_timer, pwm.period_ms);
         fprintf(stderr, "ERROR - failed to read temperature\n");
         continue;
