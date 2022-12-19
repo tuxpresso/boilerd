@@ -108,20 +108,17 @@ int main(int argc, char **argv) {
 
       int temp;
       if (boilerd_read_temp(iio_fd, &temp)) {
-        write(gpio_fd, "0", 1);
-        is_on = 0;
-        boilerd_timer_schedule(&period_timer, pwm.period_ms);
-        fprintf(stderr, "ERROR - failed to read temperature\n");
-        continue;
+        fprintf(stderr, "ERROR - failed to read temperature, not pulsing\n");
+        pwm.pulse_ms = 0;
+        goto schedule;
       }
       fprintf(stderr, "INFO  - temperature is %d\n", temp);
 
       if (temp > opts.max_temp) {
-        write(gpio_fd, "0", 1);
-        is_on = 0;
-        boilerd_timer_schedule(&period_timer, pwm.period_ms);
-        fprintf(stderr, "WARN  - temperature exceeds %d\n", opts.max_temp);
-        continue;
+        fprintf(stderr, "WARN  - temperature exceeds %d, not pulsing\n",
+                opts.max_temp);
+        pwm.pulse_ms = 0;
+        goto schedule;
       }
 
       // use error to calculate gain, then translate to pulse width
@@ -135,6 +132,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "DEBUG - pulse_ms is %d\n", pwm.pulse_ms);
 
       // schedule next pulse and period deadlines
+    schedule:
       boilerd_timer_schedule(&period_timer, pwm.period_ms);
       boilerd_timer_schedule(&pulse_timer, pwm.pulse_ms);
       fprintf(stderr, "DEBUG - pulse deadline is %d\n",
