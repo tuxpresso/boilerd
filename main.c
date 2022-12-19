@@ -105,12 +105,13 @@ int parse_opts(int argc, char **argv, struct boilerd_opts *opts) {
 int main(int argc, char **argv) {
   struct boilerd_opts opts;
   if (parse_opts(argc, argv, &opts)) {
-    fprintf(stderr, "%s -g gpio -i iio [-kp pgain -ki igain -kd dgain]\n",
+    fprintf(stderr,
+            "%s -g gpio -i iio -sp setpoint [-kp pgain -ki igain -kd dgain]\n",
             argv[0]);
     return 1;
   }
-  fprintf(stderr, "INFO  - gpio %d, iio %d, kp %d, ki %d, kd %d\n", opts.gpio,
-          opts.iio, opts.kp, opts.ki, opts.kd);
+  fprintf(stderr, "INFO  - gpio %d, iio %d, sp %d, kp %d, ki %d, kd %d\n",
+          opts.gpio, opts.iio, opts.sp, opts.kp, opts.ki, opts.kd);
 
   char path[255];
   int gpio_fd, iio_fd;
