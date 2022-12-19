@@ -17,8 +17,21 @@ struct boilerd_opts {
   int kd;
 };
 
+struct boilerd_pwm {
+  int period_ms;
+  int pulse_ms;
+  int min_pulse_ms;
+};
+
 int max(int a, int b) {
   if (a > b) {
+    return a;
+  }
+  return b;
+}
+
+int min(int a, int b) {
+  if (a < b) {
     return a;
   }
   return b;
@@ -87,15 +100,14 @@ int main(int argc, char **argv) {
   pidc_t *pidc;
   pidc_init(&pidc, opts.kp, opts.ki, opts.kd);
 
-  int min_pulse_ms = 50;
-  int period_ms = 1000;
+  struct boilerd_pwm pwm = {
+      .period_ms = 1000, .pulse_ms = 0, .min_pulse_ms = 50};
   int max_temp = 2000;
 
   struct timespec start;
   clock_gettime(CLOCK_MONOTONIC, &start);
   int now_ms = 0;
   int is_on = 0;
-  int pulse_ms = 0;
   int pulse_end_ms = 0;
   int period_end_ms = 0;
   while (1) {
@@ -136,25 +148,25 @@ int main(int argc, char **argv) {
       // use error to calculate gain, then translate to pulse width
       int e = opts.sp - temp;
       int g = pidc_update(pidc, e) >> 4;
-      pulse_ms = max(g, 0); // simple mapping for now
-      if (pulse_ms > period_ms) {
-        pulse_ms = period_ms;
-      }
+      int ms = max(g, 0);          // map gain (if positive) to pulse width
+      ms = min(ms, pwm.period_ms); // pulse can't be longer than period
+      pwm.pulse_ms = (ms == 0) ? 0 : max(ms, pwm.min_pulse_ms); // or < min
       fprintf(stderr, "TRACE - error is %d\n", e);
       fprintf(stderr, "TRACE - gain is %d\n", g);
-      fprintf(stderr, "TRACE - pulse_ms is %d\n", pulse_ms);
+      fprintf(stderr, "TRACE - pulse_ms is %d\n", pwm.pulse_ms);
 
       // schedule next pulse and period deadlines
-      period_end_ms = now_ms + period_ms;
-      if (pulse_ms > 0) {
-        pulse_end_ms = now_ms + max(pulse_ms, min_pulse_ms);
-        write(gpio_fd, "1", 1);
-        is_on = 1;
-      } else {
-        pulse_end_ms = 0;
-      }
+      period_end_ms = now_ms + pwm.period_ms;
+      pulse_end_ms = now_ms + pwm.pulse_ms;
       fprintf(stderr, "TRACE - pulse deadline is %d\n", pulse_end_ms);
       fprintf(stderr, "TRACE - period deadline is %d\n", period_end_ms);
+
+      // if it is before the pulse deadline, enable boiler
+      if (now_ms < pulse_end_ms) {
+        fprintf(stderr, "TRACE - boiler on at %d\n", now_ms);
+        write(gpio_fd, "1", 1);
+        is_on = 1;
+      }
     }
 
     usleep(500); // .5 ms tick
