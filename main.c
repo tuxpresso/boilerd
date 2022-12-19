@@ -23,6 +23,21 @@ struct boilerd_pwm {
   int min_pulse_ms;
 };
 
+struct boilerd_timer {
+  int now_ms;
+  int deadline_ms;
+};
+
+void boilerd_timer_update(struct boilerd_timer *timer, int now_ms) {
+  timer->now_ms = now_ms;
+}
+void boilerd_timer_schedule(struct boilerd_timer *timer, int duration_ms) {
+  timer->deadline_ms = timer->now_ms + duration_ms;
+}
+int boilerd_timer_is_expired(struct boilerd_timer *timer) {
+  return !(timer->now_ms < timer->deadline_ms);
+}
+
 int max(int a, int b) {
   if (a > b) {
     return a;
@@ -104,24 +119,23 @@ int main(int argc, char **argv) {
       .period_ms = 1000, .pulse_ms = 0, .min_pulse_ms = 50};
   int max_temp = 2000;
 
+  struct boilerd_timer period_timer = {0};
+  struct boilerd_timer pulse_timer = {0};
   struct timespec start;
   clock_gettime(CLOCK_MONOTONIC, &start);
-  int now_ms = 0;
   int is_on = 0;
-  int pulse_end_ms = 0;
-  int period_end_ms = 0;
   while (1) {
-    now_ms = get_elapsed_ms(&start);
+    int now_ms = get_elapsed_ms(&start);
+    boilerd_timer_update(&period_timer, now_ms);
+    boilerd_timer_update(&pulse_timer, now_ms);
 
-    // if boiler on and it is not before the pulse deadline, disable boiler
-    if (is_on && !(now_ms < pulse_end_ms)) {
+    if (is_on && boilerd_timer_is_expired(&pulse_timer)) {
       fprintf(stderr, "TRACE - boiler off at %d\n", now_ms);
       write(gpio_fd, "0", 1);
       is_on = 0;
     }
 
-    // if it is not before the period deadline
-    if (!(now_ms < period_end_ms)) {
+    if (boilerd_timer_is_expired(&period_timer)) {
       fprintf(stderr, "TRACE - it is now %d\n", now_ms);
 
       // read the temperature
@@ -140,7 +154,7 @@ int main(int argc, char **argv) {
       if (temp > max_temp) {
         write(gpio_fd, "0", 1);
         is_on = 0;
-        period_end_ms += 1000;
+        boilerd_timer_schedule(&period_timer, pwm.period_ms);
         fprintf(stderr, "ERROR - temperature exceeds %d\n", max_temp);
         continue;
       }
@@ -156,13 +170,12 @@ int main(int argc, char **argv) {
       fprintf(stderr, "TRACE - pulse_ms is %d\n", pwm.pulse_ms);
 
       // schedule next pulse and period deadlines
-      period_end_ms = now_ms + pwm.period_ms;
-      pulse_end_ms = now_ms + pwm.pulse_ms;
-      fprintf(stderr, "TRACE - pulse deadline is %d\n", pulse_end_ms);
-      fprintf(stderr, "TRACE - period deadline is %d\n", period_end_ms);
+      boilerd_timer_schedule(&period_timer, pwm.period_ms);
+      boilerd_timer_schedule(&pulse_timer, pwm.pulse_ms);
+      fprintf(stderr, "TRACE - period deadline is %d\n", period_timer.deadline_ms);
+      fprintf(stderr, "TRACE - pulse deadline is %d\n", pulse_timer.deadline_ms);
 
-      // if it is before the pulse deadline, enable boiler
-      if (now_ms < pulse_end_ms) {
+      if (!boilerd_timer_is_expired(&pulse_timer)) {
         fprintf(stderr, "TRACE - boiler on at %d\n", now_ms);
         write(gpio_fd, "1", 1);
         is_on = 1;
