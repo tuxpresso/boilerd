@@ -130,13 +130,13 @@ int main(int argc, char **argv) {
     boilerd_timer_update(&pulse_timer, now_ms);
 
     if (is_on && boilerd_timer_is_expired(&pulse_timer)) {
-      fprintf(stderr, "TRACE - boiler off at %d\n", now_ms);
+      fprintf(stderr, "DEBUG - boiler off at %d\n", now_ms);
       write(gpio_fd, "0", 1);
       is_on = 0;
     }
 
     if (boilerd_timer_is_expired(&period_timer)) {
-      fprintf(stderr, "TRACE - it is now %d\n", now_ms);
+      fprintf(stderr, "DEBUG - it is now %d\n", now_ms);
 
       // read the temperature
       char temp_buf[255];
@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
       int temp;
       if ((ret = read(iio_fd, temp_buf, 255)) > 0) {
         temp = atoi(temp_buf);
-        fprintf(stderr, "DEBUG - temperature is %d\n", temp);
+        fprintf(stderr, "INFO - temperature is %d\n", temp);
       } else {
         fprintf(stderr, "ERROR - iio read returned %zd\n", ret);
       }
@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
         write(gpio_fd, "0", 1);
         is_on = 0;
         boilerd_timer_schedule(&period_timer, pwm.period_ms);
-        fprintf(stderr, "ERROR - temperature exceeds %d\n", max_temp);
+        fprintf(stderr, "WARN  - temperature exceeds %d\n", max_temp);
         continue;
       }
 
@@ -167,16 +167,18 @@ int main(int argc, char **argv) {
       pwm.pulse_ms = (ms == 0) ? 0 : max(ms, pwm.min_pulse_ms); // or < min
       fprintf(stderr, "TRACE - error is %d\n", e);
       fprintf(stderr, "TRACE - gain is %d\n", g);
-      fprintf(stderr, "TRACE - pulse_ms is %d\n", pwm.pulse_ms);
+      fprintf(stderr, "DEBUG - pulse_ms is %d\n", pwm.pulse_ms);
 
       // schedule next pulse and period deadlines
       boilerd_timer_schedule(&period_timer, pwm.period_ms);
       boilerd_timer_schedule(&pulse_timer, pwm.pulse_ms);
-      fprintf(stderr, "TRACE - period deadline is %d\n", period_timer.deadline_ms);
-      fprintf(stderr, "TRACE - pulse deadline is %d\n", pulse_timer.deadline_ms);
+      fprintf(stderr, "DEBUG - pulse deadline is %d\n",
+              pulse_timer.deadline_ms);
+      fprintf(stderr, "DEBUG - period deadline is %d\n",
+              period_timer.deadline_ms);
 
       if (!boilerd_timer_is_expired(&pulse_timer)) {
-        fprintf(stderr, "TRACE - boiler on at %d\n", now_ms);
+        fprintf(stderr, "DEBUG - boiler on at %d\n", now_ms);
         write(gpio_fd, "1", 1);
         is_on = 1;
       }
