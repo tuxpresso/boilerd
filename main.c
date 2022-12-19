@@ -38,6 +38,19 @@ int boilerd_timer_is_expired(struct boilerd_timer *timer) {
   return !(timer->now_ms < timer->deadline_ms);
 }
 
+int boilerd_read_temp(int iio_fd, int *temp) {
+  char temp_buf[255];
+  int ret;
+  if ((ret = read(iio_fd, temp_buf, 255)) > 0) {
+    *temp = atoi(temp_buf);
+    ret = 0;
+  } else {
+    ret = 1;
+  }
+  lseek(iio_fd, 0, SEEK_SET);
+  return ret;
+}
+
 int max(int a, int b) {
   if (a > b) {
     return a;
@@ -138,19 +151,14 @@ int main(int argc, char **argv) {
     if (boilerd_timer_is_expired(&period_timer)) {
       fprintf(stderr, "DEBUG - it is now %d\n", now_ms);
 
-      // read the temperature
-      char temp_buf[255];
-      ssize_t ret;
       int temp;
-      if ((ret = read(iio_fd, temp_buf, 255)) > 0) {
-        temp = atoi(temp_buf);
-        fprintf(stderr, "INFO - temperature is %d\n", temp);
-      } else {
-        fprintf(stderr, "ERROR - iio read returned %zd\n", ret);
+      if (boilerd_read_temp(iio_fd, &temp)) {
+        boilerd_timer_schedule(&period_timer, pwm.period_ms);
+        fprintf(stderr, "ERROR - failed to read temperature\n");
+        continue;
       }
-      lseek(iio_fd, 0, SEEK_SET);
+      fprintf(stderr, "INFO  - temperature is %d\n", temp);
 
-      // if over max temperature, turn off boiler and wait
       if (temp > max_temp) {
         write(gpio_fd, "0", 1);
         is_on = 0;
