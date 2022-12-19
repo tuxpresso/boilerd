@@ -1,7 +1,12 @@
+#include <arpa/inet.h>
 #include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -58,15 +63,15 @@ int main(int argc, char **argv) {
   struct boilerd_opts opts;
   if (boilerd_opts_parse(argc, argv, &opts)) {
     fprintf(stderr,
-            "%s -g gpio -i iio -sp setpoint [-kp pgain -ki igain -kd dgain -max"
-            "max_temp]\n",
+            "%s -g gpio -i iio -h host -p port -sp setpoint [-kp pgain -ki "
+            "igain -kd dgain -max max_temp]\n",
             argv[0]);
     return 1;
   }
-  fprintf(stderr,
-          "INFO  - gpio %d, iio %d, sp %d, kp %d, ki %d, kd %d, max_temp %d\n",
-          opts.gpio, opts.iio, opts.sp, opts.kp, opts.ki, opts.kd,
-          opts.max_temp);
+  fprintf(stderr, "INFO  - gpio %d, iio %d, host %s, port %d\n", opts.gpio,
+          opts.iio, opts.host, opts.port);
+  fprintf(stderr, "INFO  - sp %d, kp %d, ki %d, kd %d, max_temp %d\n", opts.sp,
+          opts.kp, opts.ki, opts.kd, opts.max_temp);
 
   char path[255];
   int gpio_fd, iio_fd;
@@ -80,6 +85,31 @@ int main(int argc, char **argv) {
     fprintf(stderr, "FATAL - failed to open iio %d\n", opts.iio);
     return 1;
   }
+
+  int udp_fd;
+  struct addrinfo hints = {0}, *res;
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_DGRAM;
+  char port_buffer[7] = {0};
+  snprintf(port_buffer, 6, "%d", opts.port);
+  int ret;
+  if ((ret = getaddrinfo(opts.host, port_buffer, &hints, &res))) {
+    fprintf(stderr, "FATAL - failed to getaddrinfo: %s\n", gai_strerror(ret));
+    return 1;
+  }
+  if ((udp_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) <
+      0) {
+    fprintf(stderr, "FATAL - failed to open udp socket\n");
+    return 1;
+  }
+  if (bind(udp_fd, res->ai_addr, res->ai_addrlen) < 0) {
+    fprintf(stderr, "FATAL - failed to bind to udp port %d\n", opts.port);
+    return 1;
+  }
+  struct pollfd poll_set[1];
+  poll_set[0].fd = udp_fd;
+  poll_set[0].events = POLLIN;
+  poll_set[0].revents = 0;
 
   pidc_t *pidc;
   pidc_init(&pidc, opts.kp, opts.ki, opts.kd);
@@ -96,6 +126,30 @@ int main(int argc, char **argv) {
     int now_ms = get_elapsed_ms(&start);
     boilerd_timer_update(&period_timer, now_ms);
     boilerd_timer_update(&pulse_timer, now_ms);
+
+    int ret;
+    char udp_buffer[255];
+    if ((ret = poll(poll_set, 1, 0)) < 0) {
+      fprintf(stderr, "ERROR - poll returned %d\n", ret);
+    } else if (poll_set[0].revents & POLLIN) {
+      fprintf(stderr, "TRACE - poll found events\n");
+      if ((ret = recv(udp_fd, udp_buffer, 255, 0)) < 0) {
+        fprintf(stderr, "ERROR - recv returned %d\n", ret);
+      } else {
+        fprintf(stderr, "TRACE - recv %d\n", ret);
+        if (ret == sizeof(struct boilerd_runtime_opts)) {
+          fprintf(stderr, "INFO  - received settings via udp\n");
+          memcpy(&opts, udp_buffer, sizeof(opts));
+          fprintf(stderr, "INFO  - sp %d\n", opts.sp);
+          fprintf(stderr, "INFO  - kp %d\n", opts.kp);
+          fprintf(stderr, "INFO  - ki %d\n", opts.ki);
+          fprintf(stderr, "INFO  - kd %d\n", opts.kd);
+          fprintf(stderr, "INFO  - max_temp %d\n", opts.max_temp);
+          pidc_destroy(pidc);
+          pidc_init(&pidc, opts.kp, opts.ki, opts.kd);
+        }
+      }
+    }
 
     if (is_on && boilerd_timer_is_expired(&pulse_timer)) {
       fprintf(stderr, "DEBUG - boiler off at %d\n", now_ms);

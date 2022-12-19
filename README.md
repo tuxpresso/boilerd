@@ -16,4 +16,6 @@ It manipulates a GPIO, and reads temperature from an IIO sensor.
     echo $GPIO > /sys/class/gpio/export
     echo out > /sys/class/gpio/gpio$GPIO/direction
 
-    boilerd -g $GPIO -i $IIO -sp 1632 -kp 64 -ki 1 -kd 0 -max 1700
+    boilerd -g $GPIO -i $IIO \
+        -h lo -p 5555 \
+        -sp 1632 -kp 64 -ki 1 -kd 0 -max 1700

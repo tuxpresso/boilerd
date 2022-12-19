@@ -6,6 +6,8 @@
 int boilerd_opts_parse(int argc, char **argv, struct boilerd_opts *opts) {
   opts->gpio = -1;
   opts->iio = -1;
+  opts->host[0] = '\0';
+  opts->port = 0;
   opts->sp = -1;
   opts->kp = 0;
   opts->ki = 0;
@@ -16,6 +18,11 @@ int boilerd_opts_parse(int argc, char **argv, struct boilerd_opts *opts) {
       opts->gpio = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-i")) {
       opts->iio = atoi(argv[i + 1]);
+    } else if (!strcmp(argv[i], "-h")) {
+      strncpy(opts->host, argv[i + 1], BOILERD_OPTS_HOST_SIZE - 1);
+      opts->host[BOILERD_OPTS_HOST_SIZE - 1] = '\0';
+    } else if (!strcmp(argv[i], "-p")) {
+      opts->port = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-sp")) {
       opts->sp = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-kp")) {
