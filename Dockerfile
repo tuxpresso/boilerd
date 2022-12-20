@@ -9,7 +9,9 @@ RUN apt-get update \
         make
 
 WORKDIR /root
-RUN git clone https://github.com/ahepp/pidc
+RUN git clone https://github.com/ahepp/pidc \
+    && cd pidc \
+    && git checkout 30a372f7585d611323680bfcb9543f7a5ea0c5bd
 RUN mkdir pidc/build && cd pidc/build && cmake .. && make && make install
 
 FROM debian:bullseye-slim
