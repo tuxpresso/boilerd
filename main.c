@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   fprintf(stderr, "INFO  - gpio %d, iio %d\n", dopts.gpio, dopts.iio);
-  fprintf(stderr, "INFO  - host %s, port %d\n", copts.host, copts.port);
+  fprintf(stderr, "INFO  - host %s, port %s\n", copts.host, copts.port);
   fprintf(stderr, "INFO  - sp %d, kp %d, ki %d, kd %d, max_temp %d\n", ropts.sp,
           ropts.kp, ropts.ki, ropts.kd, ropts.max_temp);
 
@@ -95,10 +95,8 @@ int main(int argc, char **argv) {
   struct addrinfo hints = {0}, *res;
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_DGRAM;
-  char port_buffer[7] = {0};
-  snprintf(port_buffer, 6, "%d", copts.port);
   int ret;
-  if ((ret = getaddrinfo(copts.host, port_buffer, &hints, &res))) {
+  if ((ret = getaddrinfo(copts.host, copts.port, &hints, &res))) {
     fprintf(stderr, "FATAL - failed to getaddrinfo: %s\n", gai_strerror(ret));
     return 1;
   }
@@ -108,7 +106,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (bind(udp_fd, res->ai_addr, res->ai_addrlen) < 0) {
-    fprintf(stderr, "FATAL - failed to bind to %s:%d\n", copts.host,
+    fprintf(stderr, "FATAL - failed to bind to %s:%s\n", copts.host,
             copts.port);
     return 1;
   }

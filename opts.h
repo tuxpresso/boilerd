@@ -2,6 +2,7 @@
 #define OPTS_H
 
 #define BOILERD_OPTS_HOST_SIZE 32
+#define BOILERD_OPTS_PORT_SIZE 8
 
 struct boilerd_daemon_opts {
   int gpio;
@@ -9,7 +10,7 @@ struct boilerd_daemon_opts {
 };
 struct boilerd_common_opts {
   char host[BOILERD_OPTS_HOST_SIZE];
-  int port;
+  char port[BOILERD_OPTS_PORT_SIZE];
 };
 struct boilerd_runtime_opts {
   int sp;

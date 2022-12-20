@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
             argv[0]);
     return 1;
   }
-  fprintf(stderr, "INFO  - host %s, port %d\n", copts.host, copts.port);
+  fprintf(stderr, "INFO  - host %s, port %s\n", copts.host, copts.port);
   fprintf(stderr, "INFO  - sp %d, kp %d, ki %d, kd %d, max_temp %d\n", ropts.sp,
           ropts.kp, ropts.ki, ropts.kd, ropts.max_temp);
 
@@ -40,12 +40,10 @@ int main(int argc, char **argv) {
     fprintf(stderr, "FATAL - failed to open udp socket\n");
     return 1;
   }
-  char port_buffer[7] = {0};
-  snprintf(port_buffer, 6, "%d", copts.port);
-  getaddrinfo(copts.host, port_buffer, &hints, &targ);
+  getaddrinfo(copts.host, copts.port, &hints, &targ);
   if (sendto(udp_fd, &ropts, sizeof(ropts), 0, targ->ai_addr,
              targ->ai_addrlen) < 0) {
-    fprintf(stderr, "FATAL - failed to sendto %s:%d\n", copts.host, copts.port);
+    fprintf(stderr, "FATAL - failed to sendto %s:%s\n", copts.host, copts.port);
     return 1;
   }
 }

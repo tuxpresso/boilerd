@@ -13,7 +13,7 @@ int boilerd_opts_parse(int argc, char **argv, struct boilerd_daemon_opts *dopts,
     return 1;
   }
   copts->host[0] = '\0';
-  copts->port = 0;
+  copts->port[0] = '\0';
 
   if (ropts == NULL) {
     return 1;
@@ -33,7 +33,8 @@ int boilerd_opts_parse(int argc, char **argv, struct boilerd_daemon_opts *dopts,
       strncpy(copts->host, argv[i + 1], BOILERD_OPTS_HOST_SIZE - 1);
       copts->host[BOILERD_OPTS_HOST_SIZE - 1] = '\0';
     } else if (!strcmp(argv[i], "-p")) {
-      copts->port = atoi(argv[i + 1]);
+      strncpy(copts->port, argv[i + 1], BOILERD_OPTS_PORT_SIZE - 1);
+      copts->port[BOILERD_OPTS_PORT_SIZE - 1] = '\0';
     } else if (!strcmp(argv[i], "-sp")) {
       ropts->sp = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-kp")) {
@@ -50,5 +51,5 @@ int boilerd_opts_parse(int argc, char **argv, struct boilerd_daemon_opts *dopts,
   }
 
   int dopts_err = dopts && ((dopts->gpio < 0) || (dopts->iio < 0));
-  return dopts_err || (copts->host[0] == '\0') || (copts->port < 1);
+  return dopts_err || (copts->host[0] == '\0') || (copts->port[0] == '\0');
 }
