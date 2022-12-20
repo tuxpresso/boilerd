@@ -60,29 +60,34 @@ int get_elapsed_ms(struct timespec *then) {
 }
 
 int main(int argc, char **argv) {
-  struct boilerd_opts opts;
-  if (boilerd_opts_parse(argc, argv, &opts)) {
+  struct boilerd_daemon_opts dopts;
+  struct boilerd_common_opts copts;
+  struct boilerd_runtime_opts ropts;
+  if (boilerd_opts_parse(argc, argv, &dopts, &copts, &ropts)) {
     fprintf(stderr,
-            "%s -g gpio -i iio -h host -p port -sp setpoint [-kp pgain -ki "
-            "igain -kd dgain -max max_temp]\n",
+            "%s "
+            "-g gpio -i iio "
+            "-h host -p port "
+            "[-sp setpoint -kp pgain -ki igain -kd dgain -max max_temp]"
+            "\n",
             argv[0]);
     return 1;
   }
-  fprintf(stderr, "INFO  - gpio %d, iio %d, host %s, port %d\n", opts.gpio,
-          opts.iio, opts.host, opts.port);
-  fprintf(stderr, "INFO  - sp %d, kp %d, ki %d, kd %d, max_temp %d\n", opts.sp,
-          opts.kp, opts.ki, opts.kd, opts.max_temp);
+  fprintf(stderr, "INFO  - gpio %d, iio %d\n", dopts.gpio, dopts.iio);
+  fprintf(stderr, "INFO  - host %s, port %d\n", copts.host, copts.port);
+  fprintf(stderr, "INFO  - sp %d, kp %d, ki %d, kd %d, max_temp %d\n", ropts.sp,
+          ropts.kp, ropts.ki, ropts.kd, ropts.max_temp);
 
   char path[255];
   int gpio_fd, iio_fd;
-  sprintf(path, "/sys/class/gpio/gpio%d/value", opts.gpio);
+  sprintf(path, "/sys/class/gpio/gpio%d/value", dopts.gpio);
   if ((gpio_fd = open(path, O_WRONLY)) == -1) {
-    fprintf(stderr, "FATAL - failed to open gpio %d\n", opts.gpio);
+    fprintf(stderr, "FATAL - failed to open gpio %d\n", dopts.gpio);
     return 1;
   }
-  sprintf(path, "/sys/bus/iio/devices/iio:device%d/in_temp_raw", opts.iio);
+  sprintf(path, "/sys/bus/iio/devices/iio:device%d/in_temp_raw", dopts.iio);
   if ((iio_fd = open(path, O_RDONLY)) == -1) {
-    fprintf(stderr, "FATAL - failed to open iio %d\n", opts.iio);
+    fprintf(stderr, "FATAL - failed to open iio %d\n", dopts.iio);
     return 1;
   }
 
@@ -91,9 +96,9 @@ int main(int argc, char **argv) {
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_DGRAM;
   char port_buffer[7] = {0};
-  snprintf(port_buffer, 6, "%d", opts.port);
+  snprintf(port_buffer, 6, "%d", copts.port);
   int ret;
-  if ((ret = getaddrinfo(opts.host, port_buffer, &hints, &res))) {
+  if ((ret = getaddrinfo(copts.host, port_buffer, &hints, &res))) {
     fprintf(stderr, "FATAL - failed to getaddrinfo: %s\n", gai_strerror(ret));
     return 1;
   }
@@ -103,7 +108,8 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (bind(udp_fd, res->ai_addr, res->ai_addrlen) < 0) {
-    fprintf(stderr, "FATAL - failed to bind to udp port %d\n", opts.port);
+    fprintf(stderr, "FATAL - failed to bind to %s:%d\n", copts.host,
+            copts.port);
     return 1;
   }
   struct pollfd poll_set[1];
@@ -112,7 +118,7 @@ int main(int argc, char **argv) {
   poll_set[0].revents = 0;
 
   pidc_t *pidc;
-  pidc_init(&pidc, opts.kp, opts.ki, opts.kd);
+  pidc_init(&pidc, ropts.kp, ropts.ki, ropts.kd);
 
   struct boilerd_pwm pwm = {
       .period_ms = 1000, .pulse_ms = 0, .min_pulse_ms = 50};
@@ -139,14 +145,14 @@ int main(int argc, char **argv) {
         fprintf(stderr, "TRACE - recv %d\n", ret);
         if (ret == sizeof(struct boilerd_runtime_opts)) {
           fprintf(stderr, "INFO  - received settings via udp\n");
-          memcpy(&opts, udp_buffer, sizeof(opts));
-          fprintf(stderr, "INFO  - sp %d\n", opts.sp);
-          fprintf(stderr, "INFO  - kp %d\n", opts.kp);
-          fprintf(stderr, "INFO  - ki %d\n", opts.ki);
-          fprintf(stderr, "INFO  - kd %d\n", opts.kd);
-          fprintf(stderr, "INFO  - max_temp %d\n", opts.max_temp);
+          memcpy(&ropts, udp_buffer, sizeof(ropts));
+          fprintf(stderr, "INFO  - sp %d\n", ropts.sp);
+          fprintf(stderr, "INFO  - kp %d\n", ropts.kp);
+          fprintf(stderr, "INFO  - ki %d\n", ropts.ki);
+          fprintf(stderr, "INFO  - kd %d\n", ropts.kd);
+          fprintf(stderr, "INFO  - max_temp %d\n", ropts.max_temp);
           pidc_destroy(pidc);
-          pidc_init(&pidc, opts.kp, opts.ki, opts.kd);
+          pidc_init(&pidc, ropts.kp, ropts.ki, ropts.kd);
         }
       }
     }
@@ -168,15 +174,15 @@ int main(int argc, char **argv) {
       }
       fprintf(stderr, "INFO  - temperature is %d\n", temp);
 
-      if (temp > opts.max_temp) {
+      if (temp > ropts.max_temp) {
         fprintf(stderr, "WARN  - temperature exceeds %d, not pulsing\n",
-                opts.max_temp);
+                ropts.max_temp);
         pwm.pulse_ms = 0;
         goto schedule;
       }
 
       // use error to calculate gain, then translate to pulse width
-      int e = opts.sp - temp;
+      int e = ropts.sp - temp;
       int g = pidc_update(pidc, e) >> 4;
       int ms = max(g, 0);          // map gain (if positive) to pulse width
       ms = min(ms, pwm.period_ms); // pulse can't be longer than period

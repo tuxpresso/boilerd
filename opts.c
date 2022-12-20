@@ -2,40 +2,53 @@
 
 #include <stdlib.h>
 #include <string.h>
+int boilerd_opts_parse(int argc, char **argv, struct boilerd_daemon_opts *dopts,
+                       struct boilerd_common_opts *copts,
+                       struct boilerd_runtime_opts *ropts) {
+  if (dopts) {
+    dopts->gpio = -1;
+    dopts->iio = -1;
+  }
+  if (copts == NULL) {
+    return 1;
+  }
+  copts->host[0] = '\0';
+  copts->port = 0;
 
-int boilerd_opts_parse(int argc, char **argv, struct boilerd_opts *opts) {
-  opts->gpio = -1;
-  opts->iio = -1;
-  opts->host[0] = '\0';
-  opts->port = 0;
-  opts->sp = -1;
-  opts->kp = 0;
-  opts->ki = 0;
-  opts->kd = 0;
-  opts->max_temp = 0;
+  if (ropts == NULL) {
+    return 1;
+  }
+  ropts->sp = 0;
+  ropts->kp = 0;
+  ropts->ki = 0;
+  ropts->kd = 0;
+  ropts->max_temp = 0;
+
   for (int i = 1; i + 1 < argc; i += 2) {
-    if (!strcmp(argv[i], "-g")) {
-      opts->gpio = atoi(argv[i + 1]);
-    } else if (!strcmp(argv[i], "-i")) {
-      opts->iio = atoi(argv[i + 1]);
+    if (dopts && !strcmp(argv[i], "-g")) {
+      dopts->gpio = atoi(argv[i + 1]);
+    } else if (dopts && !strcmp(argv[i], "-i")) {
+      dopts->iio = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-h")) {
-      strncpy(opts->host, argv[i + 1], BOILERD_OPTS_HOST_SIZE - 1);
-      opts->host[BOILERD_OPTS_HOST_SIZE - 1] = '\0';
+      strncpy(copts->host, argv[i + 1], BOILERD_OPTS_HOST_SIZE - 1);
+      copts->host[BOILERD_OPTS_HOST_SIZE - 1] = '\0';
     } else if (!strcmp(argv[i], "-p")) {
-      opts->port = atoi(argv[i + 1]);
+      copts->port = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-sp")) {
-      opts->sp = atoi(argv[i + 1]);
+      ropts->sp = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-kp")) {
-      opts->kp = atoi(argv[i + 1]);
+      ropts->kp = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-ki")) {
-      opts->ki = atoi(argv[i + 1]);
+      ropts->ki = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-kd")) {
-      opts->kd = atoi(argv[i + 1]);
+      ropts->kd = atoi(argv[i + 1]);
     } else if (!strcmp(argv[i], "-max")) {
-      opts->max_temp = atoi(argv[i + 1]);
+      ropts->max_temp = atoi(argv[i + 1]);
     } else {
       return 1;
     }
   }
-  return (opts->gpio < 0) || (opts->iio < 0) || (opts->sp < 0);
+
+  int dopts_err = dopts && ((dopts->gpio < 0) || (dopts->iio < 0));
+  return dopts_err || (copts->host[0] == '\0') || (copts->port < 1);
 }

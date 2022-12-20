@@ -14,17 +14,20 @@
 #include "opts.h"
 
 int main(int argc, char **argv) {
-  struct boilerd_opts opts;
-  if (boilerd_opts_parse(argc, argv, &opts)) {
+  struct boilerd_common_opts copts;
+  struct boilerd_runtime_opts ropts;
+  if (boilerd_opts_parse(argc, argv, NULL, &copts, &ropts)) {
     fprintf(stderr,
-            "%s -p port -sp setpoint [-kp pgain -ki igain -kd dgain -max "
-            "max_temp]\n",
+            "%s "
+            "-h host -p port "
+            "[-sp setpoint -kp pgain -ki igain -kd dgain -max max_temp]"
+            "\n",
             argv[0]);
     return 1;
   }
-  fprintf(stderr, "INFO  - port %d\n", opts.port);
-  fprintf(stderr, "INFO  - sp %d, kp %d, ki %d, kd %d, max_temp %d\n", opts.sp,
-          opts.kp, opts.ki, opts.kd, opts.max_temp);
+  fprintf(stderr, "INFO  - host %s, port %d\n", copts.host, copts.port);
+  fprintf(stderr, "INFO  - sp %d, kp %d, ki %d, kd %d, max_temp %d\n", ropts.sp,
+          ropts.kp, ropts.ki, ropts.kd, ropts.max_temp);
 
   int udp_fd;
   struct addrinfo hints, *res, *targ;
@@ -38,11 +41,11 @@ int main(int argc, char **argv) {
     return 1;
   }
   char port_buffer[7] = {0};
-  snprintf(port_buffer, 6, "%d", opts.port);
-  getaddrinfo(opts.host, port_buffer, &hints, &targ);
-  if (sendto(udp_fd, &opts, sizeof(opts), 0, targ->ai_addr, targ->ai_addrlen) <
-      0) {
-    fprintf(stderr, "FATAL - failed to sendto udp port %d\n", opts.port);
+  snprintf(port_buffer, 6, "%d", copts.port);
+  getaddrinfo(copts.host, port_buffer, &hints, &targ);
+  if (sendto(udp_fd, &ropts, sizeof(ropts), 0, targ->ai_addr,
+             targ->ai_addrlen) < 0) {
+    fprintf(stderr, "FATAL - failed to sendto %s:%d\n", copts.host, copts.port);
     return 1;
   }
 }
