@@ -7,12 +7,12 @@ pipeline {
     stages {
         stage('Configure') {
             steps {
-                sh 'make -C /ws clean'
+                sh 'make -C /ws/boilerd clean'
             }
         }
         stage('Build') {
             steps {
-                sh 'make -C /ws'
+                sh 'make -C /ws/boilerd'
             }
         }
     }
