@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
   pidc_init(&pidc, ropts.kp, ropts.ki, ropts.kd);
 
   struct boilerd_pwm pwm = {
-      .period_ms = 1000, .pulse_ms = 0, .min_pulse_ms = 50};
+      .period_ms = 1000, .pulse_ms = 0, .min_pulse_ms = 20};
 
   struct boilerd_timer period_timer = {0};
   struct boilerd_timer pulse_timer = {0};
@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
 
       // use error to calculate gain, then translate to pulse width
       int e = ropts.sp - temp;
-      int g = pidc_update(pidc, e) >> 4;
+      int g = pidc_update(pidc, e) >> 8;
       int ms = max(g, 0);          // map gain (if positive) to pulse width
       ms = min(ms, pwm.period_ms); // pulse can't be longer than period
       pwm.pulse_ms = (ms == 0) ? 0 : max(ms, pwm.min_pulse_ms); // or < min
